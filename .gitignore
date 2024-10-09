@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.*.swp
+.DS_Store
+!launch.json
+npm-debug.log
+yarn-error.log
+.idea
+*.log
