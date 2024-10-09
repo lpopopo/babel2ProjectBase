@@ -1,5 +1,6 @@
 node_modules/
 dist/
+parseReslut/
 .*.swp
 .DS_Store
 !launch.json
