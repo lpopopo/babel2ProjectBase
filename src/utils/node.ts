@@ -34,7 +34,7 @@ class Node {
             return
         }
         let fileContent = astController.parseFile(this.source)
-        const { imports, exportDefault } = fileContent
+        const { imports, exportDefault, variables, functions } = fileContent
         /**
          * 处理只是把组件import在直接export的情况
          */
@@ -59,7 +59,7 @@ class Node {
             } = parseReactComponent(this.source, this.name) ?? {}
             this.linkComponents = externalComponents.filter(item => {
                 const importSpecifier = fileContent.imports.find(im => im.specifiers.find(sp => sp.name === item.name))
-                return !importSpecifier?.source.includes("node_modules")
+                return (importSpecifier || variables.includes(item.name ?? "") || functions.includes(item.name ?? "")) && !importSpecifier?.source.includes("node_modules")
             }).map(item => {
                 const importSpecifier = fileContent.imports.find(im => im.specifiers.find(sp => sp.name === item.name))
                 if (importSpecifier) {
@@ -80,7 +80,7 @@ class Node {
 
             this.linkFunctions = externalFunctions.filter(item => {
                 const importSpecifier = fileContent.imports.find(im => im.specifiers.find(sp => sp.name === item.name))
-                return !importSpecifier?.source.includes("node_modules")
+                return (importSpecifier || variables.includes(item.name ?? "") || functions.includes(item.name ?? "")) && !importSpecifier?.source.includes("node_modules")
             }).map(item => {
                 const importSpecifier = fileContent.imports.find(im => im.specifiers.find(sp => sp.name === item.name))
                 if (importSpecifier) {

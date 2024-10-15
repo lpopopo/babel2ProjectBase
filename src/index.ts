@@ -36,5 +36,5 @@ const startParseRoute = (filePath: string) => {
 
 
 
-// startParseRoute(routePath)
-startParseRoute("/Users/liushuai/Desktop/work/connor/packages/app/src/modules/project_manage_v2/components/ShelfStatusEditModal/index.tsx");
+startParseRoute(routePath)
+// startParseRoute("/Users/liushuai/Desktop/work/connor/packages/app/src/modules/project_manage_v2/components/ShelfStatusEditModal/index.tsx");

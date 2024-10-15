@@ -15,6 +15,22 @@ function extractFinalArguments(arg: t.ArgumentPlaceholder | t.SpreadElement | t.
     }
 }
 
+interface NamedItem {
+    name?: string;
+}
+
+const removeDuplicates = (array: NamedItem[]): NamedItem[] => {
+    const seen = new Set<string>();
+    return array.filter(item => {
+        if (item.name && seen.has(item.name)) {
+            return false;
+        } else {
+            item.name && seen.add(item.name);
+            return true;
+        }
+    });
+};
+
 const parseReactComponent = (filePath: string, componentName: string): { externalComponents: Array<{ name?: string }>, externalFunctions: Array<{ name?: string }> } => {
     const absolutePath = Path.resolve(filePath);
     const code = readFile(absolutePath, 'utf-8') ?? "";
@@ -32,6 +48,10 @@ const parseReactComponent = (filePath: string, componentName: string): { externa
         const { node } = path;
         // 记录函数调用
         if (node.callee.type === 'Identifier') {
+            //@ts-ignore
+            if (typeof global[node.callee.name] === 'function') {
+                return;
+            }
             let currentPath: any = path;
             while (currentPath?.parent) {
                 currentPath = currentPath.parentPath;
@@ -51,10 +71,14 @@ const parseReactComponent = (filePath: string, componentName: string): { externa
                 })
             });
         } else if (node.callee.type === "MemberExpression") {
-            const { object } = node.callee;
+            const { object, property } = node.callee;
             if (
                 object.type === "Identifier"
             ) {
+                //@ts-ignore
+                if (typeof global[object.name] === 'object' && typeof global[object.name][property.name] === 'function') {
+                    return;
+                }
                 functionCalls.push({
                     name: object.name,
                 });
@@ -213,8 +237,8 @@ const parseReactComponent = (filePath: string, componentName: string): { externa
         }
     })
 
-    const externalComponents = Components.filter(item => !functionDeclarations.some(fn => fn.name === item.name))
-    const externalFunctions = functionCalls.filter(item => !functionDeclarations.some(fn => fn.name === item.name))
+    const externalComponents = removeDuplicates(Components.filter(item => !functionDeclarations.some(fn => fn.name === item.name)))
+    const externalFunctions = removeDuplicates(functionCalls.filter(item => !functionDeclarations.some(fn => fn.name === item.name)))
 
     return {
         externalComponents,
