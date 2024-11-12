@@ -2,27 +2,31 @@ import astController from "./ast"
 import parseFile from "./ast"
 import parseReactComponent from "./parse"
 
+enum NODE_TYPE {
+    NONE = "",
+    UI_COMPONENT = "ui_component",
+    FUNCTION = "function",
+    CSS = "css"
+}
+
 class Node {
     /**
      * 文件绝对路径
      */
     source: string = ""
+    sourceCode?: string = ""
     /**
      * 函数/组件名
      */
     name: string = ""
+    nodeType: NODE_TYPE = NODE_TYPE.NONE;
     /**
      * 引用的外部组件
      */
     isImport: boolean = false
     importType: string = ""
 
-    linkComponents: Array<Node> = []
-    /**
-     * 
-     * 引用的外部函数
-     */
-    linkFunctions: Array<Node> = []
+    children: Array<Node> = []
 
     constructor(isImport: boolean = false, type?: string) {
         this.isImport = isImport
@@ -55,18 +59,22 @@ class Node {
         } else {
             const {
                 externalComponents,
-                externalFunctions
+                externalFunctions,
+                sourceCode,
+                isJsx
             } = parseReactComponent(this.source, this.name) ?? {}
-            this.linkComponents = externalComponents.filter(item => {
+            this.sourceCode = sourceCode;
+            this.nodeType = isJsx ? NODE_TYPE.UI_COMPONENT : NODE_TYPE.FUNCTION;
+            const linkComponents = externalComponents.filter(item => {
                 const importSpecifier = fileContent.imports.find(im => im.specifiers.find(sp => sp.name === item.name))
                 return (importSpecifier || variables.includes(item.name ?? "") || functions.includes(item.name ?? "")) && !importSpecifier?.source.includes("node_modules")
             }).map(item => {
                 const importSpecifier = fileContent.imports.find(im => im.specifiers.find(sp => sp.name === item.name))
                 if (importSpecifier) {
                     const specifier = importSpecifier.specifiers.find(sp => sp.name === item.name)
-                    const importNode = new Node(true , specifier?.type)
+                    const importNode = new Node(true, specifier?.type)
                     importNode.name = specifier?.name ?? ""
-                    importNode.source = importSpecifier.source
+                    importNode.source = importSpecifier.source,
                     importNode.generateLinks()
                     return importNode
                 } else {
@@ -78,7 +86,7 @@ class Node {
                 }
             })
 
-            this.linkFunctions = externalFunctions.filter(item => {
+            const linkFunctions = externalFunctions.filter(item => {
                 const importSpecifier = fileContent.imports.find(im => im.specifiers.find(sp => sp.name === item.name))
                 return (importSpecifier || variables.includes(item.name ?? "") || functions.includes(item.name ?? "")) && !importSpecifier?.source.includes("node_modules")
             }).map(item => {
@@ -98,9 +106,23 @@ class Node {
                     return node
                 }
             })
-        }
-        
 
+            const linkCss = imports.filter(
+                (importFile) => {
+                    return (
+                        importFile.source.endsWith(".css") ||
+                        importFile.source.endsWith(".less") ||
+                        importFile.source.endsWith(".scss"))
+                }
+            ).map((importFile) => {
+                const importNode = new Node(true)
+                importNode.source = importFile.source;
+                importNode.nodeType = NODE_TYPE.CSS
+                return importNode;
+            })
+
+            this.children = [...linkComponents, ...linkFunctions, ...linkCss]
+        }
 
     }
 }

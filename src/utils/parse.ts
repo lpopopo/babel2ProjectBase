@@ -3,6 +3,7 @@ import { readFile } from './readFile';
 import { parse } from '@babel/parser';
 import traverse, { NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
+import generate from "@babel/generator"
 
 function extractFinalArguments(arg: t.ArgumentPlaceholder | t.SpreadElement | t.Expression): Array<string> {
     if (arg.type === 'CallExpression') {
@@ -31,18 +32,26 @@ const removeDuplicates = (array: NamedItem[]): NamedItem[] => {
     });
 };
 
-const parseReactComponent = (filePath: string, componentName: string): { externalComponents: Array<{ name?: string }>, externalFunctions: Array<{ name?: string }> } => {
+const parseReactComponent = (filePath: string, componentName: string):
+    {
+        externalComponents: Array<{ name?: string, sourceCode?: string }>,
+        externalFunctions: Array<{ name?: string, sourceCode?: string }>,
+        sourceCode: string,
+        isJsx: boolean
+    } => {
     const absolutePath = Path.resolve(filePath);
     const code = readFile(absolutePath, 'utf-8') ?? "";
     const ast = parse(code, {
         sourceType: 'module',
-        plugins: ['typescript', 'jsx']
+        plugins: ['typescript', 'jsx', 'decorators-legacy']
     });
+    let componentSourceCode = "";
+    let isJsx = false;
 
     // 存储外部调用的组件
-    const Components: Array<{ name?: string }> = [];
-    const functionDeclarations: Array<{ name?: string }> = [];
-    const functionCalls: Array<{ name?: string }> = [];
+    const Components: Array<{ name?: string, sourceCode?: string }> = [];
+    const functionDeclarations: Array<{ name?: string, sourceCode?: string }> = [];
+    const functionCalls: Array<{ name?: string, sourceCode?: string }> = [];
 
     const parseCallExpression = (path: NodePath<t.CallExpression>): void => {
         const { node } = path;
@@ -89,7 +98,9 @@ const parseReactComponent = (filePath: string, componentName: string): { externa
     traverse(ast, {
         ClassDeclaration(path) {
             const { node } = path
+            const sourceCode = generate(node, {}, code)
             if (node.id && node.id.name === componentName) {
+                componentSourceCode = sourceCode.code;
                 path.traverse({
                     FunctionDeclaration({ node }) {
                         // 记录函数声明
@@ -122,6 +133,7 @@ const parseReactComponent = (filePath: string, componentName: string): { externa
                         parseCallExpression(path);
                     },
                     JSXIdentifier({ node, parent }) {
+                        isJsx = true
                         // 检查 JSX 元素是否是外部组件
                         if (/^[a-z]/.test(node.name)) {
                             return
@@ -137,6 +149,8 @@ const parseReactComponent = (filePath: string, componentName: string): { externa
         FunctionDeclaration(path) {
             const { node } = path
             if (node.id && node.id.name === componentName) {
+                const sourceCode = generate(node, {}, code);
+                componentSourceCode = sourceCode.code;
                 path.traverse({
                     FunctionDeclaration({ node }) {
                         // 记录函数声明
@@ -169,6 +183,7 @@ const parseReactComponent = (filePath: string, componentName: string): { externa
                         parseCallExpression(path);
                     },
                     JSXIdentifier({ node, parent }) {
+                        isJsx = true
                         // 检查 JSX 元素是否是外部组件
                         if (/^[a-z]/.test(node.name)) {
                             return
@@ -189,6 +204,8 @@ const parseReactComponent = (filePath: string, componentName: string): { externa
                 node.declarations.forEach(decl => {
                     if (t.isVariableDeclarator(decl) && t.isIdentifier(decl.id)) {
                         if (decl.id.name === componentName) {
+                            const sourceCode = generate(node, {}, code);
+                            componentSourceCode = sourceCode.code;
                             path.traverse({
                                 FunctionDeclaration({ node }) {
                                     // 记录函数声明
@@ -221,6 +238,7 @@ const parseReactComponent = (filePath: string, componentName: string): { externa
                                     parseCallExpression(path);
                                 },
                                 JSXIdentifier({ node, parent }) {
+                                    isJsx = true
                                     // 检查 JSX 元素是否是外部组件
                                     if (/^[a-z]/.test(node.name)) {
                                         return
@@ -243,6 +261,8 @@ const parseReactComponent = (filePath: string, componentName: string): { externa
     return {
         externalComponents,
         externalFunctions,
+        sourceCode: componentSourceCode,
+        isJsx
     }
 }
 

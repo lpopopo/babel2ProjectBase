@@ -64,7 +64,7 @@ class AstController {
         const code = readFile(absolutePath) ?? ""
         const ast = parse(code, {
             sourceType: 'module',
-            plugins: ['typescript', 'jsx']
+            plugins: ['typescript', 'jsx', 'decorators-legacy']
         });
 
         const imports: ParsedResult["imports"] = [];
@@ -99,7 +99,7 @@ class AstController {
                     specifiers
                 });
             },
-            ExportNamedDeclaration({ node }) {
+            ExportNamedDeclaration: ({ node }) => {
                 if (node.declaration) {
                     if (t.isVariableDeclaration(node.declaration)) {
                         node.declaration.declarations.forEach(decl => {
@@ -113,9 +113,32 @@ class AstController {
                         }
                     }
                 } else if (node.specifiers) {
-                    node.specifiers.forEach(spec => {
-                        exports.push(spec.exported.type);
-                    });
+                    if (node.source) {
+                        const sourceAbsolutePath = this.resolveImportPath(node.source.value, absolutePath);
+                        const specifiers = node.specifiers.map(specifier => {
+                            //@ts-ignore
+                            const { exported, local } = specifier
+                            if (local?.name === "default") {
+                                return {
+                                    name: (exported as t.Identifier).name,
+                                    type: "ImportDefaultSpecifier"
+                                }
+                            } else {
+                                return {
+                                    name: (exported as t.Identifier).name,
+                                    type: "ImportSpecifier"
+                                }
+                            }
+                        })
+                        imports.push({
+                            source: sourceAbsolutePath,
+                            specifiers
+                        })
+                    } else {
+                        node.specifiers.forEach(spec => {
+                            exports.push(spec.exported.type);
+                        });
+                    }
                 }
             },
             ExportDefaultDeclaration({ node }) {
