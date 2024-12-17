@@ -6,3 +6,11 @@ export interface ParsedResult {
     functions: string[];
     components: string[];
 }
+
+export interface ParsedResultMore{
+    start?: number | null;
+    end?: number | null;
+    name: string | null;
+    source: string;
+    rangs?: ParsedResultMore[]
+}

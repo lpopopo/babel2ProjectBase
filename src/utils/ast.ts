@@ -3,14 +3,16 @@ import { readFile, getFilePath } from "./readFile";
 import { parse } from "@babel/parser";
 import traverse from "@babel/traverse";
 import * as t from '@babel/types';
-import { ParsedResult } from "../typings";
+import { ParsedResult, ParsedResultMore } from "../typings";
 import ts from "typescript";
 import fs from "fs";
+import generate from "@babel/generator";
 
 class AstController {
     baseUrl: string = ""
     tsConfigPath: string = ""
     fileMap: Map<string, ParsedResult> = new Map<string, ParsedResult>()
+    fileMapMore: Map<string, ParsedResultMore[]> = new Map<string, ParsedResultMore[]>()
 
     constructor(baseUrl: string, tsConfigPath: string) {
         this.baseUrl = baseUrl
@@ -195,6 +197,104 @@ class AstController {
         this.fileMap.set(absolutePath, result);
 
         return result;
+    }
+
+    parseFileMore = (filePath: string): ParsedResultMore[] => {
+        const fileMapMore = this.fileMapMore
+        const absolutePath = Path.resolve(filePath);
+        if (this.fileMapMore.get(absolutePath)) {
+            return fileMapMore.get(absolutePath) as ParsedResultMore[]
+        }
+        const code = readFile(absolutePath) ?? ""
+        const ast = parse(code, {
+            sourceType: 'module',
+            plugins: ['typescript', 'jsx', 'decorators-legacy']
+        });
+        const list: ParsedResultMore[] = [];
+
+        traverse(ast, {
+            ImportDeclaration: ({ node }) => {
+                const source = node.source.value;
+                const sourceCode = generate(node, {}, code)
+                list.push({
+                    name: source,
+                    start: node.loc?.start.line,
+                    end: node.loc?.end.line,
+                    source: sourceCode.code
+                });
+            },
+            VariableDeclaration({ node }) {
+                node.declarations.forEach(decl => {
+                    if (t.isIdentifier(decl.id)) {
+                        if (list.find(item => item.name === (decl.id as t.Identifier).name)) {
+                            return
+                        }
+                        const sourceCode = generate(node, {}, code)
+                        list.push({
+                            name: decl.id.name,
+                            start: node.loc?.start.line,
+                            end: node.loc?.end.line,
+                            source: sourceCode.code
+                        });
+                    }
+                });
+            },
+            FunctionDeclaration({ node }) {
+                if (node.id) {
+                    const sourceCode = generate(node, {}, code)
+                    list.push({
+                        name: node.id.name,
+                        start: node.loc?.start.line,
+                        end: node.loc?.end.line,
+                        source: sourceCode.code
+                    });
+                }
+            },
+            ClassDeclaration({ node }) {
+                if (node.id) {
+                    const sourceCode = generate(node, {}, code)
+                    list.push({
+                        name: node.id.name,
+                        start: node.loc?.start.line,
+                        end: node.loc?.end.line,
+                        source: sourceCode.code
+                    });
+                }
+            },
+            ArrowFunctionExpression(path) {
+                if (t.isVariableDeclarator(path.parent) && t.isIdentifier(path.parent.id)) {
+                    if (list.find(item => item.name === ((path.parent as t.VariableDeclarator).id as t.Identifier).name)) {
+                        return
+                    }
+                    const { node } = path
+                    const sourceCode = generate(path.parent, {}, code)
+                    list.push({
+                        name: path.parent.id.name,
+                        start: node.loc?.start.line,
+                        end: node.loc?.end.line,
+                        source: sourceCode.code
+                    });
+                }
+            },
+            FunctionExpression(path) {
+                if (t.isVariableDeclarator(path.parent) && t.isIdentifier(path.parent.id)) {
+                    const { node } = path
+                    const sourceCode = generate(path.parent, {}, code)
+                    list.push({
+                        name: path.parent.id.name,
+                        start: node.loc?.start.line,
+                        end: node.loc?.end.line,
+                        source: sourceCode.code
+                    });
+                }
+            }
+        });
+
+    
+        this.fileMapMore.set(absolutePath, list);
+
+        return list;
+                
     }
 }
 
