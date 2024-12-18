@@ -9,8 +9,8 @@ import simpleGit from "simple-git"
 import Diff, { parsePatch, applyPatch  , diffLines} from "diff"
 import { nestData } from './utils/merge';
 
-const git = simpleGit(path.resolve(__dirname, "../git"));
-
+const localPath = path.resolve(__dirname, "../connor");
+const git = simpleGit();
 
 const startParseRoute = (filePath: string) => {
     const routeFile = astController.parseFile(filePath)
@@ -56,26 +56,22 @@ const getDiff2Master = async (
       },
     })
     const { diffs } = respone.data
-    console.log(respone.data)
-    diffs.forEach((item: any) => {
-        const { new_path, old_path, diff } = item;
-        const diffPath = path.resolve(__dirname, "../git", new_path);
-        const fileContent = fs.readFileSync(diffPath, 'utf8');
-        const patches = parsePatch(diff);
-        patches.forEach(patche => {
-            const updatedContent = applyPatch(fileContent, patche);
-        });
-    })
+    for (let diffFile of diffs) {
+        const { new_path, old_path } = diffFile;
+        const fileDiffReslut = await diff2BranchFile("feat/50365660/decoration_protocol_migrate", old_path, new_path)
+        console.log(fileDiffReslut)
+    }
 }
 
-const localPath = path.resolve(__dirname, "../git");
-
-// getDiff2Master("git@git.lianjia.com:xffe/connor.git")
-
-const diff2BranchFile = async (branch: string, filePath: string) => {
-    const masterFile = await git.show(`master:${filePath}`);
+const diff2BranchFile = async (branch: string, old_path: string, new_path: string) => {
+    console.log("old_path=============>", old_path)
+    const masterFile = await git.show(`master:${old_path}`);
+    const parseMasterFile = astController.parseFileMore(path.resolve(__dirname, "../git", old_path))
+    const parseMasterFileRangs = nestData(parseMasterFile)
     await git.checkout(branch)
-    const branchFile = await git.show(`${branch}:${filePath}`);
+    const parseBranchFile = astController.parseFileMore(path.resolve(__dirname, "../git", new_path))
+    const parseBranchFileRangs = nestData(parseBranchFile)
+    const branchFile = await git.show(`${branch}:${new_path}`);
     const diff = diffLines(masterFile, branchFile);
     let start = 1;
     let l = 0;
@@ -92,12 +88,6 @@ const diff2BranchFile = async (branch: string, filePath: string) => {
         }
     })
     const changes = diff4Lines.filter((change) => change.added || change.removed);
-    await git.checkout("master")
-    const parseMasterFile = astController.parseFileMore(path.resolve(__dirname, "../git", filePath))
-    const parseMasterFileRangs = nestData(parseMasterFile)
-    await git.checkout(branch)
-    const parseBranchFile = astController.parseFileMore(path.resolve(__dirname, "../git", filePath))
-    const parseBranchFileRangs = nestData(parseBranchFile)
     const changesRangs = Array.from(new Set(
         changes.map((change) => {
             if (change.added) {
@@ -114,6 +104,4 @@ const diff2BranchFile = async (branch: string, filePath: string) => {
     return changesRangs
 }
 
-
-
-diff2BranchFile("feat/50365660/decoration_protocol_migrate", "packages/app/src/modules/project_furnish/pages/detail/components/info/index.tsx")
+getDiff2Master("git@git.lianjia.com:xffe/connor.git")
