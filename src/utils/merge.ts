@@ -32,3 +32,33 @@ export function nestData(data: ParsedResultMore[]) {
     }
     return result;
 }
+
+export function mergeIntervals(intervals: ParsedResultMore[]) {
+    if (!intervals || intervals.length === 0) {
+        return [];
+    }
+    // 首先对数组进行排序，以确保所有区间按开始时间排序
+    intervals.sort((a, b) => (a?.start ?? 0) - (b?.start ?? 0));
+    const merged = [];
+    let currentInterval = intervals[0];
+
+    for (let i = 1; i < intervals.length; i++) {
+        const nextInterval = intervals[i];
+
+        // 检查当前区间的结束是否可以与下一个区间的开始连接
+        if (currentInterval.end && nextInterval.start && currentInterval.end >= nextInterval.start - 1) {
+            // 合并区间
+            currentInterval.end = Math.max(currentInterval.end, nextInterval?.end ?? 0);
+            currentInterval.source = currentInterval.source + nextInterval.source
+        } else {
+            // 如果不能合并，保存当前区间，并开始新的区间
+            merged.push(currentInterval);
+            currentInterval = nextInterval;
+        }
+    }
+
+    // 将最后一个区间加入结果
+    merged.push(currentInterval);
+
+    return merged;
+}

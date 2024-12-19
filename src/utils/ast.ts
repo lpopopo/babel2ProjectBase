@@ -7,6 +7,7 @@ import { ParsedResult, ParsedResultMore } from "../typings";
 import ts from "typescript";
 import fs from "fs";
 import generate from "@babel/generator";
+import { mergeIntervals } from "./merge";
 
 class AstController {
     baseUrl: string = ""
@@ -211,12 +212,13 @@ class AstController {
             plugins: ['typescript', 'jsx', 'decorators-legacy']
         });
         const list: ParsedResultMore[] = [];
+        const importList: ParsedResultMore[] = [];
 
         traverse(ast, {
             ImportDeclaration: ({ node }) => {
                 const source = node.source.value;
                 const sourceCode = generate(node, {}, code)
-                list.push({
+                importList.push({
                     name: source,
                     start: node.loc?.start.line,
                     end: node.loc?.end.line,
@@ -291,8 +293,9 @@ class AstController {
         });
 
     
-        this.fileMapMore.set(absolutePath, list);
-
+        const importMergedList = mergeIntervals(importList);
+        this.fileMapMore.set(absolutePath, [...importList, ...list]);
+        
         return list;
                 
     }
