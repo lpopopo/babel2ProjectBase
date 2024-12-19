@@ -1,4 +1,5 @@
 import { ParsedResultMore } from "../typings";
+import { Node } from "./node"
 
 export function nestData(data: ParsedResultMore[]) {
     // 递归函数，用于将子对象嵌套到父对象中
@@ -61,4 +62,39 @@ export function mergeIntervals(intervals: ParsedResultMore[]) {
     merged.push(currentInterval);
 
     return merged;
+}
+
+
+type SimpleNode = Omit<Node, "children" | "generateLinks">
+
+
+export const flattenNode = (node: Node, parent: Node | null = null): Array<{ pre: SimpleNode | null; content: SimpleNode }> => {
+    let result: Array<{ pre: SimpleNode | null; content: SimpleNode }> = [];
+
+    // 将当前节点自身加入结果，pre 为 parent
+    result.push({
+        pre: parent ? copyNode(parent) : null,
+        content: copyNode(node)
+    });
+
+    const { children } = node;
+    children.forEach(child => {
+        // 递归处理子节点，并将结果合并到当前结果中
+        result = result.concat(flattenNode(child, node));
+    });
+
+    return result;
+};
+
+
+const copyNode = (node: Node): SimpleNode => {
+    const copy = {
+        source: node.source,
+        sourceCode: node.sourceCode,
+        name: node.name,
+        nodeType: node.nodeType,
+        isImport: node.isImport,
+        importType: node.importType,
+    }
+    return copy
 }

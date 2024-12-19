@@ -1,6 +1,5 @@
 import fs from 'fs';
 import Path from 'path';
-import ts from 'typescript';
 
 function readFile(filePath: string, encoding: BufferEncoding = 'utf-8') {
     const extensions = ['.js', '.jsx', '.ts', '.tsx'];

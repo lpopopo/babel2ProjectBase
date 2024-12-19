@@ -42,7 +42,9 @@ class Node {
         /**
          * 处理只是把组件import在直接export的情况
          */
-        if (imports.some(item => item.specifiers.find(sp => sp.name === this.name))) {
+        if (imports.some(item => {
+            return item.specifiers.find(sp => sp.name === this.name)
+        })) {
             const importSpecifier = imports.find(im => im.specifiers.find(sp => sp.name === this.name))
             this.source = importSpecifier?.source ?? ""
             this.importType = importSpecifier?.specifiers?.[0].type ?? this.importType

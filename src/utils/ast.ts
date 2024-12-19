@@ -32,17 +32,16 @@ class AstController {
         // 处理路径别名
         for (const [alias, aliasPaths] of Object.entries(tsConfig)) {
             const aliasPattern = alias.replace('*', '');
-            if (importPath.startsWith(aliasPattern)) {
+            if ((alias.includes("*") && importPath.startsWith(aliasPattern) || (!alias.includes("*") && importPath === alias))) {
                 const relativePath = importPath.replace(aliasPattern, aliasPaths[0].replace('*', ''));
                 return getFilePath(Path.resolve(baseUrl, relativePath));
             }
         }
-
         // 处理相对路径
         if (importPath.startsWith('.')) {
             if (fs.existsSync(filePath)) {
                 const stats = fs.statSync(filePath);
-                if(stats.isDirectory()) {
+                if (stats.isDirectory()) {
                     return getFilePath(Path.resolve(filePath, importPath));
                 } else {
                     return getFilePath(Path.resolve(Path.dirname(filePath), importPath));
