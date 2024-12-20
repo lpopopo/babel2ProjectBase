@@ -1,4 +1,4 @@
-import astController from "./ast"
+import AstController from "./ast"
 import parseFile from "./ast"
 import parseReactComponent from "./parse"
 
@@ -33,7 +33,7 @@ class Node {
         this.importType = type ?? ""
     }
 
-    generateLinks() {
+    generateLinks(astController: AstController) {
         if (!this.name || !this.source || this.source.includes("node_modules")) {
             return
         }
@@ -48,15 +48,15 @@ class Node {
             const importSpecifier = imports.find(im => im.specifiers.find(sp => sp.name === this.name))
             this.source = importSpecifier?.source ?? ""
             this.importType = importSpecifier?.specifiers?.[0].type ?? this.importType
-            this.generateLinks()
+            this.generateLinks(astController)
         } else if (this.isImport && this.importType === "ImportDefaultSpecifier" && exportDefault?.[0] !== this.name) {
-            /**
+            /** 
              * export default 
              * import的时候命名可能不太一样
              */
             if (exportDefault?.[0]) {
                 this.name = exportDefault[0]
-                this.generateLinks()
+                this.generateLinks(astController)
             }
         } else {
             const {
@@ -77,13 +77,13 @@ class Node {
                     const importNode = new Node(true, specifier?.type)
                     importNode.name = specifier?.name ?? ""
                     importNode.source = importSpecifier.source,
-                    importNode.generateLinks()
+                        importNode.generateLinks(astController)
                     return importNode
                 } else {
                     const node = new Node(false)
                     node.name = item.name ?? ""
                     node.source = this.source
-                    node.generateLinks()
+                    node.generateLinks(astController)
                     return node
                 }
             })
@@ -98,25 +98,25 @@ class Node {
                     const importNode = new Node(true, specifier?.type)
                     importNode.name = specifier?.name ?? ""
                     importNode.source = importSpecifier.source
-                    importNode.generateLinks()
+                    importNode.generateLinks(astController)
                     return importNode
                 } else {
                     const node = new Node(false)
                     node.name = item.name ?? ""
                     node.source = this.source
-                    node.generateLinks()
+                    node.generateLinks(astController)
                     return node
                 }
             })
 
             const linkCss = imports.filter(
-                (importFile) => {
+                (importFile: any) => {
                     return (
                         importFile.source.endsWith(".css") ||
                         importFile.source.endsWith(".less") ||
                         importFile.source.endsWith(".scss"))
                 }
-            ).map((importFile) => {
+            ).map((importFile: any) => {
                 const importNode = new Node(true)
                 importNode.source = importFile.source;
                 importNode.nodeType = NODE_TYPE.CSS

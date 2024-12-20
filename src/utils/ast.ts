@@ -8,6 +8,8 @@ import ts from "typescript";
 import fs from "fs";
 import generate from "@babel/generator";
 import { mergeIntervals } from "./merge";
+import path from "path";
+import { localPath } from "./const";
 
 class AstController {
     baseUrl: string = ""
@@ -15,8 +17,10 @@ class AstController {
     fileMap: Map<string, ParsedResult> = new Map<string, ParsedResult>()
     fileMapMore: Map<string, ParsedResultMore[]> = new Map<string, ParsedResultMore[]>()
 
-    constructor(baseUrl: string, tsConfigPath: string) {
-        this.baseUrl = baseUrl
+    constructor(baseUrl: string) {
+        const url = path.resolve(localPath, baseUrl)
+        const tsConfigPath = path.resolve(url , "./tsconfig.json")
+        this.baseUrl = url
         this.tsConfigPath = tsConfigPath
     }
 
@@ -51,7 +55,8 @@ class AstController {
 
         // 处理 Node.js 模块
         try {
-            return getFilePath(require.resolve(importPath, { paths: [baseUrl] }))
+            const nodeModulesPath = path.resolve(this.baseUrl, "node_modules")
+            return path.resolve(nodeModulesPath, importPath)
         } catch (e) {
             return filePath;
         }
@@ -300,10 +305,4 @@ class AstController {
     }
 }
 
-export const routePath = Path.resolve(__dirname, "/Users/liushuai/Desktop/work/connor/packages/app/src/modules/project_manage_v2/pages/List/index.tsx")
-const baseUrl = Path.resolve(__dirname, "/Users/liushuai/Desktop/work/connor/packages/app");
-const tsConfigPath = Path.resolve(Path.dirname(routePath), '/Users/liushuai/Desktop/work/connor/packages/app/tsconfig.json');
-
-const astController = new AstController(baseUrl, tsConfigPath)
-
-export default astController;
+export default AstController;

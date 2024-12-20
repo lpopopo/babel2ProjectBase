@@ -1,64 +1,65 @@
 
-import parseFile, { routePath } from './utils/ast';
 import { Node } from './utils/node';
-import astController from "./utils/ast";
+import AstController from "./utils/ast";
 import fs from 'fs';
 import path from 'path';
 import Axios from 'axios';
 import simpleGit from "simple-git"
-import Diff, { parsePatch, applyPatch, diffLines } from "diff"
+import { diffLines } from "diff"
 import { flattenNode, nestData } from './utils/merge';
 import { getFilePath } from './utils/readFile';
+import { basePath, localPath } from './utils/const';
 
-const localPath = path.resolve(__dirname, "../connor");
+
 const git = simpleGit();
 
 export const startParseRoute = async (filePath: string) => {
+    const config = fs.existsSync(path.resolve(localPath, "./autoRouter.config.js")) ?
+        require(path.resolve(localPath, "./autoRouter.config.js")) :
+        require(path.resolve(basePath, "./autoRouter.config.js"))
+    const astController = new AstController(config.baseUrl)
     const routeFile = astController.parseFile(filePath)
     const exportDefault = routeFile.exportDefault?.[0]
     const routeNode = new Node()
     routeNode.name = exportDefault ?? ""
-    routeNode.source = getFilePath(filePath)
-    routeNode.generateLinks()
-    return routeNode 
+    routeNode.source = filePath
+    routeNode.generateLinks(astController)
+    return routeNode
 }
 
 
 export const getRouteParseReslut = async (
     gitPath: string,
 ) => {
-    // await git.addConfig('http.extraHeader', `PRIVATE-TOKEN: CKHeZpdidCsMYeL_nWXX`);
-    // await git.clone(gitPath, localPath);
-    // git.cwd(localPath)
+    fs.rmSync(localPath, { recursive: true, force: true });
+    await git.addConfig('http.extraHeader', `PRIVATE-TOKEN: CKHeZpdidCsMYeL_nWXX`);
+    await git.clone(gitPath, localPath);
+    git.cwd(localPath)
     //读取路由文件配置
-    if (fs.existsSync(path.resolve(localPath, "./autoRouter.config.js"))) {
-        const config = require(path.resolve(localPath, "./autoRouter.config.js"))
-        const { routers } = config ?? {}
-        if (Array.isArray(routers) &&
-            routers.length &&
-            routers.every((r) => r.path && r.componentFile)
-        ) {
-            for (let routerConfig of routers) {
-                const { path: routerPath, componentFile } = routerConfig
-                const filePath = path.resolve(localPath , componentFile)
-                const routerParseReslut = await startParseRoute(filePath)
-                const routerParseReslutList = flattenNode(routerParseReslut)
-                console.log("routerParseReslut===========>", routerParseReslutList)
-            }
-        } else {
-            //
+
+    const config = fs.existsSync(path.resolve(localPath, "./autoRouter.config.js")) ?
+        require(path.resolve(localPath, "./autoRouter.config.js")) :
+        require(path.resolve(basePath, "./autoRouter.config.js"))
+    const { routers } = config ?? {}
+    const routesParseResFlatten = {} as any
+    const routesParseRes = {} as any
+    if (Array.isArray(routers) &&
+        routers.length &&
+        routers.every((r) => r.path && r.componentFile)
+    ) {
+        for (let routerConfig of routers) {
+            const { path: routerPath, componentFile } = routerConfig
+            const filePath = path.resolve(localPath, componentFile)
+            const routerParseReslut = await startParseRoute(getFilePath(filePath))
+            const routerParseReslutList = flattenNode(routerParseReslut)
+            routesParseResFlatten[routerPath] = routerParseReslutList
+            routesParseRes[routerPath] = routerParseReslut 
         }
-    } else {
-        //
-    }
+    } 
+    fs.writeFileSync(path.resolve(basePath, "./parse.json"), JSON.stringify(routesParseRes))
+    return routesParseResFlatten
 }
 
-
-
-
-
-// startParseRoute(routePath)
-// startParseRoute("/Users/liushuai/Desktop/work/connor/packages/app/src/modules/project_manage_v2/components/ShelfStatusEditModal/index.tsx");
 
 export const getDiff2Master = async (
     gitId: string,
@@ -66,20 +67,24 @@ export const getDiff2Master = async (
     diffBranch: string,
     benchmarkBranch = "master"
 ) => {
+    fs.rmSync(localPath, { recursive: true, force: true });
     await git.addConfig('http.extraHeader', `PRIVATE-TOKEN: CKHeZpdidCsMYeL_nWXX`);
     await git.clone(gitPath, localPath);
+    const config = fs.existsSync(path.resolve(localPath, "./autoRouter.config.js")) ?
+        require(path.resolve(localPath, "./autoRouter.config.js")) :
+        require(path.resolve(basePath, "./autoRouter.config.js"))
     git.cwd(localPath)
     const respone = await Axios.get(`https://git.lianjia.com/api/v4/projects/${gitId}/repository/compare?from=${benchmarkBranch}&to=${diffBranch}`,
         {
             headers: {
                 "PRIVATE-TOKEN": "CKHeZpdidCsMYeL_nWXX",
             },
-    })
+        })
     const { diffs } = respone.data
     const diffReslut = []
     for (let diffFile of diffs) {
         const { new_path, old_path } = diffFile;
-        const fileDiffReslut = await diff2BranchFile(diffBranch, old_path, new_path)
+        const fileDiffReslut = await diff2BranchFile(diffBranch, old_path, new_path, config.baseUrl)
         diffReslut.push({
             new_path,
             old_path,
@@ -87,10 +92,12 @@ export const getDiff2Master = async (
         })
     }
     fs.rmSync(localPath, { recursive: true, force: true });
+    return diffReslut
 }
 
-const diff2BranchFile = async (branch: string, old_path: string, new_path: string) => {
+const diff2BranchFile = async (branch: string, old_path: string, new_path: string, baseUrl: string) => {
     const masterFile = await git.show(`master:${old_path}`);
+    const astController = new AstController(baseUrl)
     const parseMasterFile = astController.parseFileMore(path.resolve(__dirname, localPath, old_path))
     const parseMasterFileRangs = nestData(parseMasterFile)
     await git.checkout(branch)

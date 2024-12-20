@@ -9,3 +9,5 @@ yarn-error.log
 .idea
 *.log
 connor/
+parse.json
+res.json
